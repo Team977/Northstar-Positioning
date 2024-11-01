@@ -15,6 +15,8 @@ import org.photonvision.PhotonPoseEstimator.PoseStrategy;
 import edu.wpi.first.apriltag.AprilTag;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
+import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -22,6 +24,8 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.math.numbers.N1;
+import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.system.LinearSystem;
 import edu.wpi.first.units.Units;
 import edu.wpi.first.wpilibj.AnalogEncoder;
@@ -42,6 +46,10 @@ public class SwivleCam extends SubsystemBase{
         PoseStrategy poseStrategy;
         PhotonPoseEstimator poseEstimator;
         PhotonCamera camera;
+
+        
+         Matrix<N3, N1> kSingleTagStdDevs = VecBuilder.fill(2, 2, 4);
+         Matrix<N3, N1> kMultiTagStdDevs = VecBuilder.fill(0.1, 0.1, .1);
         
     }
 
@@ -112,6 +120,12 @@ public class SwivleCam extends SubsystemBase{
 
     private static Rotation2d rotationRange = new Rotation2d(2 * Math.PI);
 
+    public static void refreshAllBoundryArea(){
+        for(int i = 0; i < boundryAeras.size(); i++){
+            boundryAeras.get(i).refreshBoundryArea(kTagLayout);
+        }
+    }
+
     public static void setRotationRange(Rotation2d range){
         rotationRange = range;
     }
@@ -139,6 +153,7 @@ public class SwivleCam extends SubsystemBase{
     public static void setTagLayout(Path path){
         try{
             kTagLayout = new AprilTagFieldLayout(path);
+            refreshAllBoundryArea();
         }catch (Exception e){
             System.out.println("Could not open path ):");
         }
@@ -147,6 +162,7 @@ public class SwivleCam extends SubsystemBase{
     public static void setTagLayout(String path){
         try{
             kTagLayout = new AprilTagFieldLayout(path);
+            refreshAllBoundryArea();
         }catch (Exception e){
             System.out.println("Could not open path ):");
         }
@@ -154,6 +170,7 @@ public class SwivleCam extends SubsystemBase{
 
     public static void setTagLayout(List<AprilTag> apriltags, double fieldWidth, double fieldHight){
         kTagLayout = new AprilTagFieldLayout(apriltags, fieldWidth, fieldHight);
+        refreshAllBoundryArea();
     }
 
     // Object Orented
@@ -161,7 +178,7 @@ public class SwivleCam extends SubsystemBase{
     private CameraInfo cameraInfo;
     private SwivleInfo swivleCam;
 
-    public SwivleCam(int EncoderChannle, int ServoChannle, Translation3d pose, Rotation3d rotation, String cameraName, String pipelineName, PoseStrategy poseStrategy){
+    public SwivleCam(int EncoderChannle, int ServoChannle, Matrix<N3, N1> singleDev, Matrix<N3, N1> multiDev, Translation3d pose, Rotation3d rotation, String cameraName, String pipelineName, PoseStrategy poseStrategy){
 
         //create Swivle
         swivleCam.analogEncoder = new AnalogEncoder(EncoderChannle);
@@ -177,8 +194,16 @@ public class SwivleCam extends SubsystemBase{
 
         cameraInfo.rotation = rotation;
 
+        cameraInfo.kMultiTagStdDevs = multiDev;
+        cameraInfo.kSingleTagStdDevs = singleDev;
+
         cameraInfo.camera = new PhotonCamera(cameraName);
         cameraInfo.poseEstimator = new PhotonPoseEstimator(kTagLayout, poseStrategy, new Transform3d(pose, rotation));
+    }
+
+    public SwivleCam(CameraInfo cameraInfo, SwivleInfo swivleCam){
+        this.cameraInfo = cameraInfo;
+        this.swivleCam = swivleCam;
     }
 
     @Override
@@ -199,6 +224,31 @@ public class SwivleCam extends SubsystemBase{
         if (newResult) lastEstTimestamp = latestTimestamp;
         return visionEst;
     }
+
+    public Matrix<N3, N1> getEstimationStdDevs(Pose2d estimatedPose) {
+        var estStdDevs = cameraInfo.kSingleTagStdDevs;
+        var targets = cameraInfo.camera.getLatestResult().getTargets();
+        int numTags = 0;
+        double avgDist = 0;
+        for (var tgt : targets) {
+          var tagPose = cameraInfo.poseEstimator.getFieldTags().getTagPose(tgt.getFiducialId());
+          if (tagPose.isEmpty()) continue;
+          numTags++;
+          avgDist +=
+              tagPose.get().toPose2d().getTranslation().getDistance(estimatedPose.getTranslation());
+        }
+        if (numTags == 0) return estStdDevs;
+        avgDist /= numTags;
+        // Decrease std devs if multiple targets are visible
+        if (numTags > 1) estStdDevs = cameraInfo.kMultiTagStdDevs;
+        // Increase std devs based on (average) distance
+        if (numTags == 1 && avgDist > 4)
+          estStdDevs = VecBuilder.fill(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
+        else estStdDevs = estStdDevs.times(1 + (avgDist * avgDist / 30));
+    
+        return estStdDevs;
+      }
+    
 
     public Rotation2d getServoRotation(){
         return new Rotation2d(Units.Rotations.of(swivleCam.analogEncoder.get()));
