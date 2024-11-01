@@ -32,7 +32,7 @@ import edu.wpi.first.wpilibj.AnalogEncoder;
 import edu.wpi.first.wpilibj.Servo;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
-public class SwivleCam extends SubsystemBase{
+public class Vision{
 
     public class CameraInfo {
     
@@ -53,7 +53,48 @@ public class SwivleCam extends SubsystemBase{
         
     }
 
-    public class SwivleInfo{
+    //static
+    private static AprilTagFieldLayout kTagLayout =
+        AprilTagFields.kDefaultField.loadAprilTagLayoutField();
+
+    public static AprilTagFieldLayout getFieldLayout(){
+        return kTagLayout;
+    }
+
+    public static void setTagLayout(Path path){
+        try{
+            kTagLayout = new AprilTagFieldLayout(path);
+            Swivle.refreshAllBoundryArea();
+        }catch (Exception e){
+            System.out.println("Could not open path ):");
+        }
+    }
+
+    public static void setTagLayout(String path){
+        try{
+            kTagLayout = new AprilTagFieldLayout(path);
+            Swivle.refreshAllBoundryArea();
+        }catch (Exception e){
+            System.out.println("Could not open path ):");
+        }
+    }
+
+    public static void setTagLayout(List<AprilTag> apriltags, double fieldWidth, double fieldHight){
+        kTagLayout = new AprilTagFieldLayout(apriltags, fieldWidth, fieldHight);
+            Swivle.refreshAllBoundryArea();
+    }
+
+    // diffent Cams Orented
+
+    /**
+     * Swivle
+     */
+    public class Swivle extends SubsystemBase{
+    
+        private static List<BoundryAera> boundryAeras;
+        private static Supplier<Pose2d> robotPose;
+
+            public class SwivleInfo{
         Servo servo;
         AnalogEncoder analogEncoder;
     }
@@ -110,17 +151,9 @@ public class SwivleCam extends SubsystemBase{
         }
     }
 
-    //static
-    private static double TimeStampTreashould = 0.01;
-    private static AprilTagFieldLayout kTagLayout =
-        AprilTagFields.kDefaultField.loadAprilTagLayoutField();
+        private static Rotation2d rotationRange = new Rotation2d(2 * Math.PI);
 
-    private static List<BoundryAera> boundryAeras;
-    private static Supplier<Pose2d> robotPose;
-
-    private static Rotation2d rotationRange = new Rotation2d(2 * Math.PI);
-
-    public static void refreshAllBoundryArea(){
+            public static void refreshAllBoundryArea(){
         for(int i = 0; i < boundryAeras.size(); i++){
             boundryAeras.get(i).refreshBoundryArea(kTagLayout);
         }
@@ -146,39 +179,11 @@ public class SwivleCam extends SubsystemBase{
         return boundryAeras;
     }
 
-    public static AprilTagFieldLayout getFieldLayout(){
-        return kTagLayout;
-    }
+        //object
+        private CameraInfo cameraInfo;
+        private SwivleInfo swivleCam;
 
-    public static void setTagLayout(Path path){
-        try{
-            kTagLayout = new AprilTagFieldLayout(path);
-            refreshAllBoundryArea();
-        }catch (Exception e){
-            System.out.println("Could not open path ):");
-        }
-    }
-
-    public static void setTagLayout(String path){
-        try{
-            kTagLayout = new AprilTagFieldLayout(path);
-            refreshAllBoundryArea();
-        }catch (Exception e){
-            System.out.println("Could not open path ):");
-        }
-    }
-
-    public static void setTagLayout(List<AprilTag> apriltags, double fieldWidth, double fieldHight){
-        kTagLayout = new AprilTagFieldLayout(apriltags, fieldWidth, fieldHight);
-        refreshAllBoundryArea();
-    }
-
-    // Object Orented
-
-    private CameraInfo cameraInfo;
-    private SwivleInfo swivleCam;
-
-    public SwivleCam(int EncoderChannle, int ServoChannle, Matrix<N3, N1> singleDev, Matrix<N3, N1> multiDev, Translation3d pose, Rotation3d rotation, String cameraName, String pipelineName, PoseStrategy poseStrategy){
+     public Swivle(int EncoderChannle, int ServoChannle, Matrix<N3, N1> singleDev, Matrix<N3, N1> multiDev, Translation3d pose, Rotation3d rotation, String cameraName, String pipelineName, PoseStrategy poseStrategy){
 
         //create Swivle
         swivleCam.analogEncoder = new AnalogEncoder(EncoderChannle);
@@ -201,7 +206,7 @@ public class SwivleCam extends SubsystemBase{
         cameraInfo.poseEstimator = new PhotonPoseEstimator(kTagLayout, poseStrategy, new Transform3d(pose, rotation));
     }
 
-    public SwivleCam(CameraInfo cameraInfo, SwivleInfo swivleCam){
+    public Swivle(CameraInfo cameraInfo, SwivleInfo swivleCam){
         this.cameraInfo = cameraInfo;
         this.swivleCam = swivleCam;
     }
@@ -298,6 +303,9 @@ public class SwivleCam extends SubsystemBase{
 
         return new AprilTag(0, new Pose3d());
     }
+    }
+
+    
 
 
 
