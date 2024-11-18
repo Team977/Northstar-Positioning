@@ -1,11 +1,16 @@
 package frc.robot.util.Libary;
 
 import com.ctre.phoenix6.StatusSignal;
+import com.fasterxml.jackson.core.TSFBuilder;
+import com.fasterxml.jackson.databind.ser.std.StdKeySerializers.Default;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StructArrayPublisher;
@@ -15,6 +20,9 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
+
+import javax.sound.midi.VoiceStatus;
 
 public class PoseTracker {
 
@@ -428,15 +436,17 @@ public class PoseTracker {
     }
   }
 
-  /** RobotTracker */
+  /** OdometryTracker */
   public class OdometryTracker {
 
     private static List<Moudule> modules = new ArrayList<>();
     private static GyroValues gyroValues;
     public static Pose2d pose = new Pose2d(0, 0, new Rotation2d(0));
 
+    private static FOMdataOdymetry FOM = new FOMdataOdymetry(() -> getPose(), 0);
+
     public static void setPose(Pose2d pose) {
-      RobotTracker.pose = pose;
+      OdometryTracker.pose = pose;
     }
 
     public static Pose2d getPose() {
@@ -444,7 +454,7 @@ public class PoseTracker {
     }
 
     public static void setGyroValues(GyroValues gyroValues) {
-      RobotTracker.gyroValues = gyroValues;
+      OdometryTracker.gyroValues = gyroValues;
     }
 
     public static void addModules(Moudule newModule) {
@@ -532,12 +542,8 @@ public class PoseTracker {
                   translationOffset.getY(),
                   pose.getRotation().minus(gyroValues.getYaw())));
 
-      SwerveModuleState[] swerveModuleState = new SwerveModuleState[modules.size()];
-      for (int i = 0; i < modules.size(); i++) {
-        swerveModuleState[i] = modules.get(i).getSwerveModuleState();
-      }
 
-      swervePublisher.set(swerveModuleState);
+      swervePublisher.set(getSwerbModuleStates());
       robotOffsetPublisher.set(translationOffset);
       posePublisher.set(getPose());
     }
@@ -550,9 +556,144 @@ public class PoseTracker {
 
       updateOdymetryPose();
     }
+
+    public static SwerveModuleState[] getSwerbModuleStates(){
+      
+      SwerveModuleState[] swerveModuleState = new SwerveModuleState[modules.size()];
+      for (int i = 0; i < modules.size(); i++) {
+        swerveModuleState[i] = modules.get(i).getSwerveModuleState();
+      }
+      return swerveModuleState;
+    }
+
+    private static SwerveDriveKinematics kinematics;
+    private static double SkidThreashould;
+    private static double SkidMagnitude;
+
+    public static void UseSkidInFOMClaclations(SwerveDriveKinematics kinematics, double Threashould, double SkidMagnitude){
+      PoseTracker.OdometryTracker.SkidMagnitude = SkidMagnitude;
+      OdometryTracker.SkidThreashould = Threashould;
+      OdometryTracker.kinematics = kinematics;
+
+      FOM.addFOM(() -> getSkiddingFOM());
+    }
+
+    public static double getSkiddingFOM(){
+      double SkidRatio = getSkidRatio(kinematics);
+
+      if(SkidRatio < SkidRatio){
+        return 0;
+      }
+
+      return (SkidRatio - SkidThreashould) * SkidMagnitude;
+    }
+
+    public static double getSkidRatio(SwerveDriveKinematics kinematics){
+      SwerveModuleState[] swerveModuleStates = getSwerbModuleStates();
+      return getSkiddingRatio(swerveModuleStates, kinematics);
+
+    }
+
+    private static double getSkiddingRatio(SwerveModuleState[] swerveStatesMeasured, SwerveDriveKinematics swerveDriveKinematics) {
+        final double angularVelocityOmegaMeasured = swerveDriveKinematics.toChassisSpeeds(swerveStatesMeasured).omegaRadiansPerSecond;
+        final SwerveModuleState[] swerveStatesRotationalPart = swerveDriveKinematics.toSwerveModuleStates(new ChassisSpeeds(0, 0, angularVelocityOmegaMeasured));
+        final double[] swerveStatesTranslationalPartMagnitudes = new double[swerveStatesMeasured.length];
+
+        for (int i =0; i < swerveStatesMeasured.length; i++) {
+            final Translation2d swerveStateMeasuredAsVector = convertSwerveStateToVelocityVector(swerveStatesMeasured[i]),
+                    swerveStatesRotationalPartAsVector = convertSwerveStateToVelocityVector(swerveStatesRotationalPart[i]),
+                    swerveStatesTranslationalPartAsVector = swerveStateMeasuredAsVector.minus(swerveStatesRotationalPartAsVector);
+            swerveStatesTranslationalPartMagnitudes[i] = swerveStatesTranslationalPartAsVector.getNorm();
+        }
+
+        double maximumTranslationalSpeed = 0, minimumTranslationalSpeed = Double.POSITIVE_INFINITY;
+        for (double translationalSpeed:swerveStatesTranslationalPartMagnitudes) {
+            maximumTranslationalSpeed = Math.max(maximumTranslationalSpeed, translationalSpeed);
+            minimumTranslationalSpeed = Math.min(minimumTranslationalSpeed, translationalSpeed);
+        }
+
+        return maximumTranslationalSpeed / minimumTranslationalSpeed;
+    }
+
+    private static Translation2d convertSwerveStateToVelocityVector(SwerveModuleState swerveModuleState) {
+        return new Translation2d(swerveModuleState.speedMetersPerSecond, swerveModuleState.angle);
+    }
+  }
+
+  public static interface FOMDataIO {
+  
+    public default void addFOM(DoubleSupplier fOMdataSuppliers){
+
+    }
+
+    public default void DontTust(){
+
+    }
+
+    public default void setBaseFOM(double FOM){
+
+    }
+
+    public default double getFOM(){
+      return 0;
+    }
+    
+    public default Pose2d getPose() { return new Pose2d();}
+  }
+
+  public static class FOMdataOdymetry implements FOMDataIO {
+    
+    Supplier<Pose2d> pose;
+    double BaseFOM = 0;
+    
+    public FOMdataOdymetry(Supplier<Pose2d> pose, double baseFOM) {
+      this.pose = pose;
+      BaseFOM = baseFOM;
+    }
+
+    List<DoubleSupplier> FOMMdataSuppliers = new ArrayList<>();
+
+    public void addFOM(DoubleSupplier fOMdataSuppliers){
+      FOMMdataSuppliers.add(fOMdataSuppliers);
+    }
+
+    public void DontTust(){
+      BaseFOM = Double.MAX_VALUE;
+    }
+
+    public void setBaseFOM(double FOM){
+      BaseFOM = FOM;
+    }
+
+
+    public double getFOM(){
+      return CalalateFOM();
+    }
+
+    private double CalalateFOM(){
+      double FOM = BaseFOM;
+
+      if(FOM == Double.MAX_VALUE){
+        return FOM;
+      }
+
+      for(DoubleSupplier FOMdata: FOMMdataSuppliers){
+        FOM += FOMdata.getAsDouble();
+      }
+
+      return FOM;
+    }
+
+    public default Pose2d getPose() { return pose.get();}
+
+
   }
 
   public static Pose2d pose;
+
+  public static List<Supplier<FOMDataIO>> fomSuppliers;
+
+  public static boolean UseInbuitOdymetryTracker;
 
   public static Pose2d getPose() {
     return pose;
@@ -560,5 +701,23 @@ public class PoseTracker {
 
   public static void setPose(Pose2d pose) {
     PoseTracker.pose = pose;
+  }
+
+  public static void addFOMSupllier(Supplier<FOMDataIO> FOMData){
+    fomSuppliers.add(FOMData);
+  }
+
+  public static double claclateNewPose(){
+    double acclutiveFOM = 0;
+
+    Pose2d acclulativePose = new Pose2d();
+
+    for(Supplier<FOMDataIO> fomSupplier: fomSuppliers){
+      FOMDataIO fomData =  fomSupplier.get();
+      double inversedFOM = 1 / Math.pow(fomData.getFOM(), 2);
+
+      Pose2d MagnitudePose = fomData.
+
+    }
   }
 }
