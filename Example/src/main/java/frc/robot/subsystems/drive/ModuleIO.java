@@ -14,7 +14,7 @@
 package frc.robot.subsystems.drive;
 
 import edu.wpi.first.math.geometry.Rotation2d;
-import frc.robot.util.Libary.PoseTracker;
+import frc.robot.util.Libary.Odymetery;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface ModuleIO {
@@ -47,11 +47,11 @@ public interface ModuleIO {
   /** Enable or disable brake mode on the turn motor. */
   public default void setTurnBrakeMode(boolean enable) {}
 
-  public default PoseTracker.EncoderValues getDriveEncoderValues() {
-    return new PoseTracker.EncoderValuesNULL();
+  public default Odymetery.EncoderValues getDriveEncoderValues() {
+    return new Odymetery.EncoderValuesNULL();
   }
 
-  public default PoseTracker.EncoderValues getTurnEncoderValues() {
-    return new PoseTracker.EncoderValuesNULL();
+  public default Odymetery.EncoderValues getTurnEncoderValues() {
+    return new Odymetery.EncoderValuesNULL();
   }
 }
