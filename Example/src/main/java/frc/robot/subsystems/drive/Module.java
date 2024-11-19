@@ -20,7 +20,7 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import frc.robot.Constants;
-import frc.robot.util.Libary.Odymetery;
+import frc.robot.util.Libary.PoseTracker;
 import org.littletonrobotics.junction.Logger;
 
 public class Module {
@@ -173,11 +173,11 @@ public class Module {
     return inputs.driveVelocityRadPerSec;
   }
 
-  public Odymetery.EncoderValues getDriveEncoderValues() {
+  public PoseTracker.EncoderValues getDriveEncoderValues() {
     return io.getDriveEncoderValues();
   }
 
-  public Odymetery.EncoderValues getTurnEncoderValues() {
+  public PoseTracker.EncoderValues getTurnEncoderValues() {
     return io.getTurnEncoderValues();
   }
 }

@@ -15,7 +15,7 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import frc.robot.util.Libary.Odymetery;
+import frc.robot.util.Libary.PoseTracker;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -101,8 +101,8 @@ public class Robot extends LoggedRobot {
     // the Command-based framework to work.
     CommandScheduler.getInstance().run();
 
-    Odymetery.refresh();
-    // field2d.setRobotPose(Odymetery.getPose());
+    PoseTracker.RobotTracker.refresh();
+    // field2d.setRobotPose(PoseTracker.RobotTracker.getPose());
 
     // SmartDashboard.putData("TEST odm", field2d);
   }

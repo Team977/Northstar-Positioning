@@ -14,7 +14,7 @@
 package frc.robot.subsystems.drive;
 
 import edu.wpi.first.math.geometry.Rotation2d;
-import frc.robot.util.Libary.Odymetery;
+import frc.robot.util.Libary.PoseTracker;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface GyroIO {
@@ -27,7 +27,7 @@ public interface GyroIO {
 
   public default void updateInputs(GyroIOInputs inputs) {}
 
-  public default Odymetery.GyroValues getGyroValues() {
-    return new Odymetery.GyroDoubleSupplier(() -> 0, () -> 0, () -> 0, () -> 0);
+  public default PoseTracker.GyroValues getGyroValues() {
+    return new PoseTracker.GyroDoubleSupplier(() -> 0, () -> 0, () -> 0, () -> 0);
   }
 }

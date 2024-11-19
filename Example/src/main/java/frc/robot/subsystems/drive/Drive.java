@@ -38,7 +38,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.Constants;
-import frc.robot.util.Libary.Odymetery;
+import frc.robot.util.Libary.PoseTracker;
 import frc.robot.util.LocalADStarAK;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -123,36 +123,36 @@ public class Drive extends SubsystemBase {
                 this));
 
     if (Constants.currentMode == Constants.Mode.SIM) {
-      Odymetery.addModules(
-          new Odymetery.Moudule(
+      PoseTracker.RobotTracker.addModules(
+          new PoseTracker.Moudule(
               new Rotation2d(0),
               modules[0].getDriveEncoderValues(),
               modules[0].getTurnEncoderValues(),
               new Translation2d(-DRIVE_BASE_RADIUS, DRIVE_BASE_RADIUS)));
 
-      Odymetery.addModules(
-          new Odymetery.Moudule(
+      PoseTracker.RobotTracker.addModules(
+          new PoseTracker.Moudule(
               new Rotation2d(0),
               modules[1].getDriveEncoderValues(),
               modules[1].getTurnEncoderValues(),
               new Translation2d(DRIVE_BASE_RADIUS, DRIVE_BASE_RADIUS)));
 
-      Odymetery.addModules(
-          new Odymetery.Moudule(
+      PoseTracker.RobotTracker.addModules(
+          new PoseTracker.Moudule(
               new Rotation2d(0),
               modules[2].getDriveEncoderValues(),
               modules[2].getTurnEncoderValues(),
               new Translation2d(-DRIVE_BASE_RADIUS, -DRIVE_BASE_RADIUS)));
 
-      Odymetery.addModules(
-          new Odymetery.Moudule(
+      PoseTracker.RobotTracker.addModules(
+          new PoseTracker.Moudule(
               new Rotation2d(0),
               modules[3].getDriveEncoderValues(),
               modules[3].getTurnEncoderValues(),
               new Translation2d(DRIVE_BASE_RADIUS, -DRIVE_BASE_RADIUS)));
     }
 
-    Odymetery.setGyroValues(gyroIO.getGyroValues());
+    PoseTracker.RobotTracker.setGyroValues(gyroIO.getGyroValues());
   }
 
   public void periodic() {

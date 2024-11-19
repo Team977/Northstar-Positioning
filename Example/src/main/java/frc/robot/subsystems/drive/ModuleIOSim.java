@@ -17,7 +17,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import frc.robot.util.Libary.Odymetery;
+import frc.robot.util.Libary.PoseTracker;
 
 /**
  * Physics sim implementation of module IO.
@@ -67,13 +67,13 @@ public class ModuleIOSim implements ModuleIO {
     turnSim.setInputVoltage(turnAppliedVolts);
   }
 
-  public Odymetery.EncoderValues getDriveEncoderValues() {
-    return new Odymetery.EncoderValuesSIM(
+  public PoseTracker.EncoderValues getDriveEncoderValues() {
+    return new PoseTracker.EncoderValuesSIM(
         () -> driveSim.getAngularPositionRotations(), () -> getDriveRPS(), () -> 0);
   }
 
-  public Odymetery.EncoderValues getTurnEncoderValues() {
-    return new Odymetery.EncoderValuesSIM(
+  public PoseTracker.EncoderValues getTurnEncoderValues() {
+    return new PoseTracker.EncoderValuesSIM(
         () -> turnSim.getAngularPositionRotations(),
         () -> turnSim.getAngularVelocityRPM(),
         () -> 0);
