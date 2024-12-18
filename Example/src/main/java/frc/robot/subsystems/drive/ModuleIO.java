@@ -14,7 +14,7 @@
 package frc.robot.subsystems.drive;
 
 import edu.wpi.first.math.geometry.Rotation2d;
-import frc.robot.util.Libary.PoseTracker;
+import java.util.function.DoubleSupplier;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface ModuleIO {
@@ -24,12 +24,14 @@ public interface ModuleIO {
     public double driveVelocityRadPerSec = 0.0;
     public double driveAppliedVolts = 0.0;
     public double[] driveCurrentAmps = new double[] {};
+    public double driveTime = 0.0;
 
     public Rotation2d turnAbsolutePosition = new Rotation2d();
     public Rotation2d turnPosition = new Rotation2d();
     public double turnVelocityRadPerSec = 0.0;
     public double turnAppliedVolts = 0.0;
     public double[] turnCurrentAmps = new double[] {};
+    public double turnTime = 0.0;
   }
 
   /** Updates the set of loggable inputs. */
@@ -47,11 +49,19 @@ public interface ModuleIO {
   /** Enable or disable brake mode on the turn motor. */
   public default void setTurnBrakeMode(boolean enable) {}
 
-  public default PoseTracker.EncoderValues getDriveEncoderValues() {
-    return new PoseTracker.EncoderValuesNULL();
+  public default double getGearRatio() {
+    return 0.0;
   }
 
-  public default PoseTracker.EncoderValues getTurnEncoderValues() {
-    return new PoseTracker.EncoderValuesNULL();
+  public default double getWhealDiameter() {
+    return 0.0;
+  }
+
+  public default DoubleSupplier getWhealRotation() {
+    return () -> 0;
+  }
+
+  public default DoubleSupplier getDrivePosition() {
+    return () -> 0;
   }
 }

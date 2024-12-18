@@ -20,7 +20,6 @@ import com.ctre.phoenix6.configs.Pigeon2Configuration;
 import com.ctre.phoenix6.hardware.Pigeon2;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
-import frc.robot.util.Libary.PoseTracker;
 
 /** IO implementation for Pigeon2 */
 public class GyroIOPigeon2 implements GyroIO {
@@ -41,13 +40,5 @@ public class GyroIOPigeon2 implements GyroIO {
     inputs.connected = BaseStatusSignal.refreshAll(yaw, yawVelocity).equals(StatusCode.OK);
     inputs.yawPosition = Rotation2d.fromDegrees(yaw.getValueAsDouble());
     inputs.yawVelocityRadPerSec = Units.degreesToRadians(yawVelocity.getValueAsDouble());
-  }
-
-  public PoseTracker.GyroValues getGyroValues() {
-    return new PoseTracker.GyroStatusSingnal(
-        pigeon.getYaw(),
-        pigeon.getAngularVelocityZWorld(),
-        pigeon.getAccelerationX(),
-        pigeon.getAccelerationY());
   }
 }

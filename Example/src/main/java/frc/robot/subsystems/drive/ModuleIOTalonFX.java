@@ -25,6 +25,7 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
+import java.util.function.DoubleSupplier;
 
 /**
  * Module IO implementation for Talon FX drive motor controller, Talon FX turn motor controller, and
@@ -42,6 +43,8 @@ public class ModuleIOTalonFX implements ModuleIO {
   private final TalonFX driveTalon;
   private final TalonFX turnTalon;
   private final CANcoder cancoder;
+
+  private final double CANCoderOffset;
 
   private final StatusSignal<Double> drivePosition;
   private final StatusSignal<Double> driveVelocity;
@@ -64,28 +67,28 @@ public class ModuleIOTalonFX implements ModuleIO {
   public ModuleIOTalonFX(int index) {
     switch (index) {
       case 0:
-        driveTalon = new TalonFX(0);
-        turnTalon = new TalonFX(1);
+        driveTalon = new TalonFX(1);
+        turnTalon = new TalonFX(2);
         cancoder = new CANcoder(2);
-        absoluteEncoderOffset = new Rotation2d(0.0); // MUST BE CALIBRATED
+        absoluteEncoderOffset = new Rotation2d(Units.rotationsToRadians(0.0)); // MUST BE CALIBRATED
         break;
       case 1:
         driveTalon = new TalonFX(3);
         turnTalon = new TalonFX(4);
-        cancoder = new CANcoder(5);
-        absoluteEncoderOffset = new Rotation2d(0.0); // MUST BE CALIBRATED
+        cancoder = new CANcoder(4);
+        absoluteEncoderOffset = new Rotation2d(Units.rotationsToRadians(0.0)); // MUST BE CALIBRATED
         break;
       case 2:
-        driveTalon = new TalonFX(6);
-        turnTalon = new TalonFX(7);
-        cancoder = new CANcoder(8);
-        absoluteEncoderOffset = new Rotation2d(0.0); // MUST BE CALIBRATED
+        driveTalon = new TalonFX(5);
+        turnTalon = new TalonFX(6);
+        cancoder = new CANcoder(6);
+        absoluteEncoderOffset = new Rotation2d(Units.rotationsToRadians(0.0)); // MUST BE CALIBRATED
         break;
       case 3:
-        driveTalon = new TalonFX(9);
-        turnTalon = new TalonFX(10);
-        cancoder = new CANcoder(11);
-        absoluteEncoderOffset = new Rotation2d(0.0); // MUST BE CALIBRATED
+        driveTalon = new TalonFX(7);
+        turnTalon = new TalonFX(8);
+        cancoder = new CANcoder(8);
+        absoluteEncoderOffset = new Rotation2d(Units.rotationsToRadians(0.0)); // MUST BE CALIBRATED
         break;
       default:
         throw new RuntimeException("Invalid module index");
@@ -129,6 +132,9 @@ public class ModuleIOTalonFX implements ModuleIO {
         turnCurrent);
     driveTalon.optimizeBusUtilization();
     turnTalon.optimizeBusUtilization();
+
+    turnAbsolutePosition.refresh();
+    CANCoderOffset = turnAbsolutePosition.getValueAsDouble() - absoluteEncoderOffset.getRadians();
   }
 
   @Override
@@ -189,5 +195,17 @@ public class ModuleIOTalonFX implements ModuleIO {
             : InvertedValue.CounterClockwise_Positive;
     config.NeutralMode = enable ? NeutralModeValue.Brake : NeutralModeValue.Coast;
     turnTalon.getConfigurator().apply(config);
+  }
+
+  public DoubleSupplier getWhealRotation() {
+    turnPosition.refresh();
+    return () ->
+        Units.rotationsToRadians(turnPosition.getValueAsDouble()) / TURN_GEAR_RATIO
+            + CANCoderOffset;
+  }
+
+  public DoubleSupplier getDrivePosition() {
+    drivePosition.refresh();
+    return () -> Units.rotationsToRadians(drivePosition.getValueAsDouble());
   }
 }

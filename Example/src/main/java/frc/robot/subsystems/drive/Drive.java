@@ -30,6 +30,8 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.StructPublisher;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -38,7 +40,8 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.Constants;
-import frc.robot.util.Libary.PoseTracker;
+import frc.robot.util.Libary.Odymetery;
+import frc.robot.util.Libary.Odymetery.gyroTimeStep;
 import frc.robot.util.LocalADStarAK;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -67,6 +70,9 @@ public class Drive extends SubsystemBase {
       };
   private SwerveDrivePoseEstimator poseEstimator =
       new SwerveDrivePoseEstimator(kinematics, rawGyroRotation, lastModulePositions, new Pose2d());
+
+  private static StructPublisher<Pose2d> Position =
+      NetworkTableInstance.getDefault().getStructTopic("real Pose", Pose2d.struct).publish();
 
   private Field2d field2d = new Field2d();
 
@@ -123,39 +129,22 @@ public class Drive extends SubsystemBase {
                 this));
 
     if (Constants.currentMode == Constants.Mode.SIM) {
-      PoseTracker.RobotTracker.addModules(
-          new PoseTracker.Moudule(
-              new Rotation2d(0),
-              modules[0].getDriveEncoderValues(),
-              modules[0].getTurnEncoderValues(),
-              new Translation2d(-DRIVE_BASE_RADIUS, DRIVE_BASE_RADIUS)));
+      Odymetery.setGyroTimeStep(() -> getGyroTimeStamp());
 
-      PoseTracker.RobotTracker.addModules(
-          new PoseTracker.Moudule(
-              new Rotation2d(0),
-              modules[1].getDriveEncoderValues(),
-              modules[1].getTurnEncoderValues(),
-              new Translation2d(DRIVE_BASE_RADIUS, DRIVE_BASE_RADIUS)));
-
-      PoseTracker.RobotTracker.addModules(
-          new PoseTracker.Moudule(
-              new Rotation2d(0),
-              modules[2].getDriveEncoderValues(),
-              modules[2].getTurnEncoderValues(),
-              new Translation2d(-DRIVE_BASE_RADIUS, -DRIVE_BASE_RADIUS)));
-
-      PoseTracker.RobotTracker.addModules(
-          new PoseTracker.Moudule(
-              new Rotation2d(0),
-              modules[3].getDriveEncoderValues(),
-              modules[3].getTurnEncoderValues(),
-              new Translation2d(DRIVE_BASE_RADIUS, -DRIVE_BASE_RADIUS)));
+    } else {
+      Odymetery.setGyroTimeStep(() -> gyroIO.getTimeStamp());
     }
 
-    PoseTracker.RobotTracker.setGyroValues(gyroIO.getGyroValues());
+    Odymetery.addModlue(modules[0].getOdymetryModlueUnit());
+    Odymetery.addModlue(modules[1].getOdymetryModlueUnit());
+    Odymetery.addModlue(modules[2].getOdymetryModlueUnit());
+    Odymetery.addModlue(modules[3].getOdymetryModlueUnit());
   }
 
   public void periodic() {
+
+    Position.accept(getPose());
+
     gyroIO.updateInputs(gyroInputs);
     Logger.processInputs("Drive/Gyro", gyroInputs);
     for (var module : modules) {
@@ -317,5 +306,13 @@ public class Drive extends SubsystemBase {
       new Translation2d(-TRACK_WIDTH_X / 2.0, TRACK_WIDTH_Y / 2.0),
       new Translation2d(-TRACK_WIDTH_X / 2.0, -TRACK_WIDTH_Y / 2.0)
     };
+  }
+
+  public gyroTimeStep getGyroTimeStamp() {
+    Odymetery.gyroTimeStep GyroTimeStep = new Odymetery.gyroTimeStep();
+
+    GyroTimeStep.rotation = poseEstimator.getEstimatedPosition().getRotation();
+
+    return GyroTimeStep;
   }
 }
