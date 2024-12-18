@@ -1,5 +1,6 @@
 package frc.robot.util.Libary;
 
+import com.google.flatbuffers.FlexBuffers.Vector;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -9,12 +10,9 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StructPublisher;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
-
-import javax.swing.text.StyleContext.SmallAttributeSet;
 
 public class Odymetery {
 
@@ -285,6 +283,8 @@ public class Odymetery {
 
     OdymeteryPose.accept(pose);
 
+    getSkidFOM();
+
     return pose;
   }
 
@@ -293,7 +293,49 @@ public class Odymetery {
   }
 
   private static double getSkidFOM() {
-    return 0;
+
+    double FOM = 0;
+
+    for (Module.ModlueTimeStamp ThisTimeStamps : TimeStamps) {
+      FOM += getSkidRatioModlue(deltaPosition, ThisTimeStamps) / TimeStamps.size();
+    }
+    SmartDashboard.putNumber("SkidFOM", FOM);
+    return FOM;
+  }
+
+  /** Vector */
+  public static class Vector {
+
+    Rotation2d rotation;
+    double Magnitude;
+
+    public Vector(Rotation2d rotation, double magnitude) {
+      this.rotation = rotation;
+      Magnitude = magnitude;
+    }
+
+    public Vector(Transform2d transform) {
+      rotation = new Rotation2d(Math.atan2(transform.getY(), transform.getX()));
+      Magnitude = Math.sqrt(Math.pow(transform.getX(), 2) + Math.pow(transform.getY(), 2));
+    }
+
+    public Vector(Translation2d transform) {
+      rotation = new Rotation2d(Math.atan2(transform.getY(), transform.getX()));
+      Magnitude = Math.sqrt(Math.pow(transform.getX(), 2) + Math.pow(transform.getY(), 2));
+    }
+  }
+
+  private static double getSkidRatioModlue(
+      Transform2d deltaPosition, Module.ModlueTimeStamp modlueTimeStamp) {
+    Vector robotPosition = new Vector(deltaPosition);
+    Vector modluePosition = new Vector(modlueTimeStamp.offset);
+
+    Vector diff =
+        new Vector(
+            robotPosition.rotation.minus(modluePosition.rotation),
+            robotPosition.Magnitude - modluePosition.Magnitude);
+
+    return diff.rotation.getRadians() + diff.Magnitude;
   }
 
   private static double getAcclFOM() {
