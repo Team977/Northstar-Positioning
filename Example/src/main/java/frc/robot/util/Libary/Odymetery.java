@@ -285,6 +285,9 @@ public class Odymetery {
 
     getSkidFOM();
 
+    SmartDashboard.putNumber(
+        "Nort erro", pose.getTranslation().getDistance(new Translation2d(0, 0)));
+
     return pose;
   }
 

@@ -190,6 +190,9 @@ public class Drive extends SubsystemBase {
 
     field2d.setRobotPose(poseEstimator.getEstimatedPosition());
     SmartDashboard.putData("Pose of Robot", field2d);
+    SmartDashboard.putNumber(
+        "Adv Erro",
+        poseEstimator.getEstimatedPosition().getTranslation().getDistance(new Translation2d(0, 0)));
   }
 
   /**
