@@ -9,26 +9,24 @@ import java.util.function.Supplier;
 
 public class TransformFOM {
 
-  private List<Supplier<FOMSupplier>> suppliers = new ArrayList<>();
+  private List<FOMSupplier> suppliers = new ArrayList<>();
 
   // Transform2d newData;
 
-  public void addSupplier(Supplier<FOMSupplier> newData) {
+  public void addSupplier(FOMSupplier newData) {
     suppliers.add(newData);
   }
 
   public Transform2d update() {
 
-    double TotaleFOM = 1;
+    double TotaleFOM = 0;
     Transform2d totatData = new Transform2d(0, 0, new Rotation2d(0));
 
-    for (Supplier<FOMSupplier> instance : suppliers) {
+    for (FOMSupplier instance : suppliers) {
 
-      FOMSupplier newFOMSupplier = instance.get();
+      double InversedFOM = 1 / Math.pow(instance.FOM.get(), 2);
 
-      double InversedFOM = 1 / Math.pow(newFOMSupplier.FOM, 2);
-
-      Transform2d partTransform = newFOMSupplier.Data.times(InversedFOM);
+      Transform2d partTransform = instance.Offset.get().times(InversedFOM);
 
       TotaleFOM += InversedFOM;
       totatData = totatData.plus(partTransform);
@@ -41,7 +39,7 @@ public class TransformFOM {
   /** FOMSupplier */
   public static class FOMSupplier {
 
-    Transform2d Data;
-    double FOM;
+    Supplier<Transform2d> Offset;
+    Supplier<Double> FOM;
   }
 }

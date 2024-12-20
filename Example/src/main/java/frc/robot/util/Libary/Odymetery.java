@@ -14,7 +14,6 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.util.Libary.TransformFOM.FOMSupplier;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
@@ -33,7 +32,7 @@ public class Odymetery {
     public Rotation2d rotation = new Rotation2d();
     public double xAccl = 0;
     public double yAccl = 0;
-    public double time = 0;
+    public double Time = 0;
   }
 
   // Module,
@@ -231,28 +230,26 @@ public class Odymetery {
 
   static TransformFOM transformFOM = new TransformFOM();
 
-  public static void CreateFOM() {
-    FOMSupplier fomSupplier = new FOMSupplier();
-    fomSupplier.FOM = 0.1;
-    fomSupplier.Data = new Transform2d(0, 0, new Rotation2d(0));
-    // transformFOM.addSupplier(() -> fomSupplier);
-    transformFOM.addSupplier(() -> getSupplier());
-  }
-
   static List<Module> modlues = new ArrayList<>();
   static Supplier<gyroTimeStep> gyroTimeStep;
 
   static List<Module.ModlueTimeStamp> TimeStamps = new ArrayList<>();
   static Pose2d pose = new Pose2d();
+  static Pose2d AcclerationPose = new Pose2d();
   static Transform2d deltaPosition = new Transform2d(0, 0, new Rotation2d(0));
 
   static boolean IsSIM = true;
   static SwerveDriveKinematics swerveDriveKinematics;
 
+  static GyroAcclFilter gyroAcclFilter;
+
   private static StructPublisher<Pose2d> OdymeteryPose =
       NetworkTableInstance.getDefault()
           .getStructTopic("new Odymetry Pose", Pose2d.struct)
           .publish();
+
+  private static StructPublisher<Pose2d> acclerationPosePublisher =
+      NetworkTableInstance.getDefault().getStructTopic("Accleration Pose", Pose2d.struct).publish();
 
   public static void addModlue(Module module) {
     modlues.add(module);
@@ -260,13 +257,17 @@ public class Odymetery {
 
   public static void setGyroTimeStep(Supplier<gyroTimeStep> gyroTimeStep) {
     Odymetery.gyroTimeStep = gyroTimeStep;
+    gyroAcclFilter =
+        new GyroAcclFilter(() -> gyroTimeStep.get().xAccl, () -> gyroTimeStep.get().yAccl);
   }
 
   public static Pose2d Upddate() {
 
     deltaPosition = getTransformOffset();
-    pose = pose.plus(transformFOM.update());
+    pose = pose.plus(deltaPosition);
+    AcclerationPose = AcclerationPose.plus(getAcclOffset());
 
+    acclerationPosePublisher.accept(AcclerationPose);
     OdymeteryPose.accept(pose);
 
     getSkidFOM();
@@ -296,11 +297,8 @@ public class Odymetery {
 
     averagedOffset = averagedOffset.div(modlues.size());
 
-    Rotation2d rotation = gyroTimeStep.get().rotation;
-
     Transform2d applyedRotation =
-        new Transform2d(
-            averagedOffset.getX(), averagedOffset.getY(), rotation.minus(pose.getRotation()));
+        new Transform2d(averagedOffset.getX(), averagedOffset.getY(), getRotationOffset());
     // pose.getRotation().minus(rotation));
 
     deltaPosition = applyedRotation;
@@ -311,13 +309,9 @@ public class Odymetery {
 
   public static FOMSupplier getSupplier() {
     FOMSupplier fomSupplier = new FOMSupplier();
-    fomSupplier.FOM = 1 / 2;
-    fomSupplier.Data = deltaPosition;
+    fomSupplier.FOM = () -> getSkidFOM();
+    fomSupplier.Offset = () -> getTransformOffset();
     return fomSupplier;
-  }
-
-  public static double getFOM() {
-    return getSkidFOM() + getAcclFOM();
   }
 
   private static double getSkidFOM() {
@@ -329,6 +323,13 @@ public class Odymetery {
     }
     SmartDashboard.putNumber("SkidFOM", FOM);
     return FOM;
+  }
+
+  public static void Instantiate() {
+    // fomSupplier.FOM = 0.1;
+    // fomSupplier.Data = new Transform2d(0, 0, new Rotation2d(0));
+    // transformFOM.addSupplier(() -> fomSupplier);
+    transformFOM.addSupplier(getSupplier());
   }
 
   /** Vector */
@@ -366,14 +367,7 @@ public class Odymetery {
     return diff.rotation.getRadians() + diff.Magnitude;
   }
 
-  private static double getAcclFOM() {
-    return getAcclOffset();
-  }
-
-  public static double getAcclOffset() {
-
-    // sets gyro time stamp so no change
-    gyroTimeStep timeStep = gyroTimeStep.get();
+  public static Translation2d getModlueAvgAccleration() {
 
     Translation2d swerveAccl = new Translation2d(0, 0);
 
@@ -384,16 +378,27 @@ public class Odymetery {
     }
 
     swerveAccl = swerveAccl.div(modlues.size());
-    //
+    return swerveAccl;
+  }
 
-    double accleDistanceOffset =
-        getDistanceTraveled(new Translation2d(timeStep.xAccl, timeStep.yAccl));
-    double swerveDistanceOffset = getDistanceTraveled(swerveAccl);
+  public static FOMSupplier getAcclFOMSupplier() {
+    FOMSupplier fomSupplier = new FOMSupplier();
+    fomSupplier.FOM = () -> getAcclTrust();
+    fomSupplier.Offset = () -> getTransformOffset();
+    return fomSupplier;
+  }
 
-    double diff = Math.abs(accleDistanceOffset - swerveDistanceOffset);
-    SmartDashboard.putNumber("accleration Diff", diff);
+  public static double getAcclTrust() {
+    return gyroAcclFilter.getError();
+  }
 
-    return diff;
+  public static Transform2d getAcclOffset() {
+    Translation2d offset = gyroAcclFilter.update(gyroTimeStep.get().Time);
+    return new Transform2d(offset.getX(), offset.getY(), getRotationOffset());
+  }
+
+  public static Rotation2d getRotationOffset() {
+    return gyroTimeStep.get().rotation.minus(pose.getRotation());
   }
 
   private static double getDistanceTraveled(Translation2d offset) {
@@ -413,11 +418,10 @@ public class Odymetery {
   }
 
   /** GyroFOMandAccl */
-  public class GyroFOMandAccl {
-
-    Consumer<Double> dConsumer;
+  public static class GyroAcclFilter {
 
     static final int RESULTION = 5;
+    static final double accelerationDueToGravity = 9.8;
 
     static final AxisFilter X = new AxisFilter(RESULTION);
     static final AxisFilter Y = new AxisFilter(RESULTION);
@@ -425,14 +429,24 @@ public class Odymetery {
     DoubleSupplier XAccle;
     DoubleSupplier YAccle;
 
-    public GyroFOMandAccl(DoubleSupplier xAccle, DoubleSupplier yAccle) {
+    double previusTimeStamp;
+
+    public GyroAcclFilter(DoubleSupplier xAccle, DoubleSupplier yAccle) {
       XAccle = xAccle;
       YAccle = yAccle;
     }
 
-    public Translation2d update() {
+    public Translation2d update(double Time) {
 
-      return new Translation2d(X.Update(XAccle.getAsDouble()), Y.Update(YAccle.getAsDouble()));
+      double TimeDiff = Time - previusTimeStamp;
+
+      double ProssedXAccl = X.Update(XAccle.getAsDouble() * accelerationDueToGravity / TimeDiff);
+      double ProssedYAccl = Y.Update(YAccle.getAsDouble() * accelerationDueToGravity / TimeDiff);
+
+      SmartDashboard.putNumber("X Accleration", ProssedXAccl);
+      SmartDashboard.putNumber("Y Accleration", ProssedYAccl);
+
+      return new Translation2d(ProssedXAccl, ProssedYAccl);
     }
 
     public double getError() {

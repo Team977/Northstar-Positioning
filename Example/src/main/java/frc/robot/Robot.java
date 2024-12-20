@@ -90,7 +90,7 @@ public class Robot extends LoggedRobot {
     // and put our autonomous chooser on the dashboard.
     robotContainer = new RobotContainer();
 
-    Odymetery.CreateFOM();
+    Odymetery.Instantiate();
   }
 
   /** This function is called periodically during all modes. */

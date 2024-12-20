@@ -28,12 +28,16 @@ public class GyroIOPigeon2 implements GyroIO {
   private final Pigeon2 pigeon = new Pigeon2(20, Constants.CANbusName);
   private final StatusSignal<Double> yaw = pigeon.getYaw();
   private final StatusSignal<Double> yawVelocity = pigeon.getAngularVelocityZWorld();
+  private final StatusSignal<Double> XAccleration = pigeon.getAccelerationX();
+  private final StatusSignal<Double> YAccleration = pigeon.getAccelerationY();
 
   public GyroIOPigeon2() {
     pigeon.getConfigurator().apply(new Pigeon2Configuration());
     pigeon.getConfigurator().setYaw(0.0);
     yaw.setUpdateFrequency(100.0);
     yawVelocity.setUpdateFrequency(100.0);
+    XAccleration.setUpdateFrequency(100);
+    YAccleration.setUpdateFrequency(100);
     pigeon.optimizeBusUtilization();
   }
 
@@ -49,6 +53,10 @@ public class GyroIOPigeon2 implements GyroIO {
 
     yaw.refresh();
     timeStep.rotation = Rotation2d.fromDegrees(yaw.getValueAsDouble());
+    timeStep.xAccl = XAccleration.getValueAsDouble();
+    timeStep.yAccl = YAccleration.getValueAsDouble();
+    timeStep.Time =
+        (XAccleration.getTimestamp().getTime() + YAccleration.getTimestamp().getTime()) / 2;
 
     return timeStep;
   }
