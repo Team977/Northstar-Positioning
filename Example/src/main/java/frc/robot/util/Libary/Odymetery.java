@@ -443,6 +443,8 @@ public class Odymetery {
       double ProssedXAccl = X.Update(XAccle.getAsDouble() * accelerationDueToGravity / TimeDiff);
       double ProssedYAccl = Y.Update(YAccle.getAsDouble() * accelerationDueToGravity / TimeDiff);
 
+      previusTimeStamp = Time;
+
       SmartDashboard.putNumber("X Accleration", ProssedXAccl);
       SmartDashboard.putNumber("Y Accleration", ProssedYAccl);
 
