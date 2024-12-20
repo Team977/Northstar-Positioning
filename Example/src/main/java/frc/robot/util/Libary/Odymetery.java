@@ -1,6 +1,7 @@
 package frc.robot.util.Libary;
 
 import com.google.flatbuffers.FlexBuffers.Vector;
+import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -10,8 +11,11 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StructPublisher;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import frc.robot.util.Libary.TransformFOM.FOMSupplier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 public class Odymetery {
@@ -225,12 +229,22 @@ public class Odymetery {
     }
   }
 
+  static TransformFOM transformFOM = new TransformFOM();
+
+  public static void CreateFOM() {
+    FOMSupplier fomSupplier = new FOMSupplier();
+    fomSupplier.FOM = 0.1;
+    fomSupplier.Data = new Transform2d(0, 0, new Rotation2d(0));
+    // transformFOM.addSupplier(() -> fomSupplier);
+    transformFOM.addSupplier(() -> getSupplier());
+  }
+
   static List<Module> modlues = new ArrayList<>();
   static Supplier<gyroTimeStep> gyroTimeStep;
 
   static List<Module.ModlueTimeStamp> TimeStamps = new ArrayList<>();
   static Pose2d pose = new Pose2d();
-  static Transform2d deltaPosition = new Transform2d();
+  static Transform2d deltaPosition = new Transform2d(0, 0, new Rotation2d(0));
 
   static boolean IsSIM = true;
   static SwerveDriveKinematics swerveDriveKinematics;
@@ -250,6 +264,20 @@ public class Odymetery {
 
   public static Pose2d Upddate() {
 
+    deltaPosition = getTransformOffset();
+    pose = pose.plus(transformFOM.update());
+
+    OdymeteryPose.accept(pose);
+
+    getSkidFOM();
+
+    SmartDashboard.putNumber(
+        "Nort erro", pose.getTranslation().getDistance(new Translation2d(0, 0)));
+
+    return pose;
+  }
+
+  public static Transform2d getTransformOffset() {
     // create the using time stamps
     List<Module.ModlueTimeStamp> timeStamps = new ArrayList<>();
 
@@ -276,19 +304,16 @@ public class Odymetery {
     // pose.getRotation().minus(rotation));
 
     deltaPosition = applyedRotation;
-
-    pose = pose.plus(applyedRotation);
-
     TimeStamps = timeStamps;
 
-    OdymeteryPose.accept(pose);
+    return deltaPosition;
+  }
 
-    getSkidFOM();
-
-    SmartDashboard.putNumber(
-        "Nort erro", pose.getTranslation().getDistance(new Translation2d(0, 0)));
-
-    return pose;
+  public static FOMSupplier getSupplier() {
+    FOMSupplier fomSupplier = new FOMSupplier();
+    fomSupplier.FOM = 1 / 2;
+    fomSupplier.Data = deltaPosition;
+    return fomSupplier;
   }
 
   public static double getFOM() {
@@ -385,5 +410,54 @@ public class Odymetery {
     offset = offset.div(ModluesStates.size());
 
     return offset;
+  }
+
+  /** GyroFOMandAccl */
+  public class GyroFOMandAccl {
+
+    Consumer<Double> dConsumer;
+
+    static final int RESULTION = 5;
+
+    static final AxisFilter X = new AxisFilter(RESULTION);
+    static final AxisFilter Y = new AxisFilter(RESULTION);
+
+    DoubleSupplier XAccle;
+    DoubleSupplier YAccle;
+
+    public GyroFOMandAccl(DoubleSupplier xAccle, DoubleSupplier yAccle) {
+      XAccle = xAccle;
+      YAccle = yAccle;
+    }
+
+    public Translation2d update() {
+
+      return new Translation2d(X.Update(XAccle.getAsDouble()), Y.Update(YAccle.getAsDouble()));
+    }
+
+    public double getError() {
+      return X.getError() + Y.getError();
+    }
+
+    /** AxisFilter */
+    public static class AxisFilter {
+
+      public AxisFilter(int reslution) {
+        this.x = LinearFilter.movingAverage(reslution);
+      }
+
+      LinearFilter x;
+      double Error = 0;
+
+      public double Update(double input) {
+        double filter = x.calculate(input);
+        Error = input - filter;
+        return x.calculate(input);
+      }
+
+      public double getError() {
+        return Error;
+      }
+    }
   }
 }
