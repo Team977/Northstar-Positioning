@@ -31,6 +31,9 @@ public class GyroIOPigeon2 implements GyroIO {
   private final StatusSignal<Double> XAccleration = pigeon.getAccelerationX();
   private final StatusSignal<Double> YAccleration = pigeon.getAccelerationY();
 
+  private final double STARTXAccl;
+  private final double STARTYAccl;
+
   public GyroIOPigeon2() {
     pigeon.getConfigurator().apply(new Pigeon2Configuration());
     pigeon.getConfigurator().setYaw(0.0);
@@ -39,6 +42,12 @@ public class GyroIOPigeon2 implements GyroIO {
     XAccleration.setUpdateFrequency(100);
     YAccleration.setUpdateFrequency(100);
     pigeon.optimizeBusUtilization();
+
+    XAccleration.refresh();
+    YAccleration.refresh();
+
+    STARTXAccl = XAccleration.getValueAsDouble();
+    STARTYAccl = YAccleration.getValueAsDouble();
   }
 
   @Override
@@ -52,6 +61,8 @@ public class GyroIOPigeon2 implements GyroIO {
     Odymetery.gyroTimeStep timeStep = new Odymetery.gyroTimeStep();
 
     yaw.refresh();
+    XAccleration.refresh();
+    YAccleration.refresh();
     timeStep.rotation = Rotation2d.fromDegrees(yaw.getValueAsDouble());
     timeStep.xAccl = XAccleration.getValueAsDouble();
     timeStep.yAccl = YAccleration.getValueAsDouble();

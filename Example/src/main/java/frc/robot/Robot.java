@@ -103,7 +103,6 @@ public class Robot extends LoggedRobot {
     // the Command-based framework to work.
     CommandScheduler.getInstance().run();
 
-    Odymetery.Upddate();
     // field2d.setRobotPose(PoseTracker.OdometryTracker.getPose());
 
     // SmartDashboard.putData("TEST odm", field2d);
@@ -115,11 +114,15 @@ public class Robot extends LoggedRobot {
 
   /** This function is called periodically when disabled. */
   @Override
-  public void disabledPeriodic() {}
+  public void disabledPeriodic() {
+    Odymetery.addGyroSample();
+  }
 
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
+
+    Odymetery.updateGyroAvg();
     autonomousCommand = robotContainer.getAutonomousCommand();
 
     // schedule the autonomous command (example)
@@ -130,7 +133,9 @@ public class Robot extends LoggedRobot {
 
   /** This function is called periodically during autonomous. */
   @Override
-  public void autonomousPeriodic() {}
+  public void autonomousPeriodic() {
+    Odymetery.Upddate();
+  }
 
   /** This function is called once when teleop is enabled. */
   @Override
@@ -142,11 +147,15 @@ public class Robot extends LoggedRobot {
     if (autonomousCommand != null) {
       autonomousCommand.cancel();
     }
+
+    Odymetery.updateGyroAvg();
   }
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
+  public void teleopPeriodic() {
+    Odymetery.Upddate();
+  }
 
   /** This function is called once when test mode is enabled. */
   @Override
@@ -165,5 +174,7 @@ public class Robot extends LoggedRobot {
 
   /** This function is called periodically whilst in simulation. */
   @Override
-  public void simulationPeriodic() {}
+  public void simulationPeriodic() {
+    Odymetery.Upddate();
+  }
 }

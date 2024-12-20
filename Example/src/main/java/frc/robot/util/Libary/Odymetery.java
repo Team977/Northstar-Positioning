@@ -1,6 +1,7 @@
 package frc.robot.util.Libary;
 
 import com.google.flatbuffers.FlexBuffers.Vector;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -14,7 +15,6 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.util.Libary.TransformFOM.FOMSupplier;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 public class Odymetery {
@@ -257,8 +257,8 @@ public class Odymetery {
 
   public static void setGyroTimeStep(Supplier<gyroTimeStep> gyroTimeStep) {
     Odymetery.gyroTimeStep = gyroTimeStep;
-    gyroAcclFilter =
-        new GyroAcclFilter(() -> gyroTimeStep.get().xAccl, () -> gyroTimeStep.get().yAccl);
+    gyroAcclFilter = new GyroAcclFilter(gyroTimeStep);
+    // new GyroAcclFilter(() -> gyroTimeStep.get().xAccl, () -> gyroTimeStep.get().yAccl);
   }
 
   public static Pose2d Upddate() {
@@ -330,6 +330,7 @@ public class Odymetery {
     // fomSupplier.Data = new Transform2d(0, 0, new Rotation2d(0));
     // transformFOM.addSupplier(() -> fomSupplier);
     transformFOM.addSupplier(getSupplier());
+    AcclerationPose = new Pose2d(0, 0, new Rotation2d());
   }
 
   /** Vector */
@@ -417,38 +418,88 @@ public class Odymetery {
     return offset;
   }
 
+  public static void updateGyroAvg() {
+    gyroAcclFilter.UpdateAvg();
+  }
+
+  public static void addGyroSample() {
+    gyroAcclFilter.addAvges();
+  }
+
   /** GyroFOMandAccl */
   public static class GyroAcclFilter {
 
-    static final int RESULTION = 5;
+    static final int RESULTION = 50;
     static final double accelerationDueToGravity = 9.8;
 
     static final AxisFilter X = new AxisFilter(RESULTION);
     static final AxisFilter Y = new AxisFilter(RESULTION);
 
-    DoubleSupplier XAccle;
-    DoubleSupplier YAccle;
+    double AcclumitveXVeclcity = 0;
+    double AcclumitveYVeclcity = 0;
+
+    Supplier<gyroTimeStep> gyroTimeStamp;
+
+    AvaerageValue xAvaerageValue;
+    AvaerageValue yAvaerageValue;
+
+    public GyroAcclFilter(Supplier<frc.robot.util.Libary.Odymetery.gyroTimeStep> gyroTimeStamp) {
+      this.gyroTimeStamp = gyroTimeStamp;
+
+      xAvaerageValue = new AvaerageValue(500, () -> this.gyroTimeStamp.get().xAccl);
+      yAvaerageValue = new AvaerageValue(500, () -> this.gyroTimeStamp.get().yAccl);
+    }
 
     double previusTimeStamp;
 
-    public GyroAcclFilter(DoubleSupplier xAccle, DoubleSupplier yAccle) {
-      XAccle = xAccle;
-      YAccle = yAccle;
+    // public GyroAcclFilter(DoubleSupplier xAccle, DoubleSupplier yAccle) {
+    //  XAccle = xAccle;
+    //  YAccle = yAccle;
+    // }
+
+    public void addAvges() {
+
+      xAvaerageValue.Update();
+      yAvaerageValue.Update();
+
+      AcclumitveXVeclcity = 0;
+      AcclumitveYVeclcity = 0;
     }
 
     public Translation2d update(double Time) {
 
-      double TimeDiff = Time - previusTimeStamp;
+      double TimeDiff = 0.02; // Time - previusTimeStamp;
 
-      double ProssedXAccl = X.Update(XAccle.getAsDouble() * accelerationDueToGravity / TimeDiff);
-      double ProssedYAccl = Y.Update(YAccle.getAsDouble() * accelerationDueToGravity / TimeDiff);
+      double ProssedXAccl =
+          MathUtil.applyDeadband(
+              X.Update(gyroTimeStamp.get().yAccl - yAvaerageValue.getPreviusAvg())
+                  // * accelerationDueToGravity
+                  * TimeDiff,
+              0.001);
+      double ProssedYAccl =
+          MathUtil.applyDeadband(
+              Y.Update(gyroTimeStamp.get().xAccl - xAvaerageValue.getPreviusAvg())
+                  // * accelerationDueToGravity
+                  * TimeDiff,
+              0.001);
 
       previusTimeStamp = Time;
 
+      AcclumitveXVeclcity += ProssedXAccl;
+      AcclumitveYVeclcity += ProssedYAccl;
+
       SmartDashboard.putNumber("X Accleration", ProssedXAccl);
       SmartDashboard.putNumber("Y Accleration", ProssedYAccl);
+      SmartDashboard.putNumber("X Vel", AcclumitveXVeclcity);
+      SmartDashboard.putNumber("Y vel", AcclumitveYVeclcity);
+      SmartDashboard.putNumber("Time", TimeDiff);
 
-      return new Translation2d(ProssedXAccl, ProssedYAccl);
+      return new Translation2d(AcclumitveXVeclcity, AcclumitveYVeclcity);
+    }
+
+    public void UpdateAvg() {
+      xAvaerageValue.Avg();
+      yAvaerageValue.Avg();
     }
 
     public double getError() {
